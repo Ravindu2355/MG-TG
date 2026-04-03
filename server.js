@@ -24,6 +24,14 @@ fs.ensureDirSync(DOWNLOAD_DIR);
 
 let extractedFiles = [];
 
+let downloadStatus = {
+  status: "idle",
+  file: null,
+  progress: 0,
+  speed: null,
+  done: false
+};
+
 function cleanNode(node) {
   console.log(node);
   return {
@@ -94,6 +102,24 @@ app.get('/extract', async (req, res) => {
 });
 
 /* ---------------------------
+   DOWNLOAD check
+--------------------------- */
+app.get('/download-status', (req, res) => {
+  res.json(downloadStatus);
+});
+/* ---------------------------
+   UPLOAD CHECK
+--------------------------- */
+app.get('/upload-status', (req, res) => {
+  const filePath = path.join(__dirname, 'upload-status.json');
+
+  if (!fs.existsSync(filePath)) {
+    return res.json({ status: "no data" });
+  }
+
+  res.sendFile(filePath);
+});
+/* ---------------------------
    DOWNLOAD JSON
 --------------------------- */
 app.get('/json', (req, res) => {
@@ -156,9 +182,9 @@ app.get('/download', async (req, res) => {
     res.send({
       message: "Downloaded",
       file: `/download/${file.name}`
-    });*/
+    });
     
-    /*This download properly works only woth retying system */
+    //This download properly works only woth retying system 
     const stream = await megaFile.download();
 
     const writeStream = fs.createWriteStream(savePath);
@@ -171,6 +197,46 @@ app.get('/download', async (req, res) => {
         message: "Downloaded",
         file: `/download/${file.name}`
       });
+    });*/
+
+    const stream = await megaFile.download();
+    const writeStream = fs.createWriteStream(savePath);
+
+    let downloaded = 0;
+    let startTime = Date.now();
+
+    downloadStatus = {
+      status: "downloading",
+      file: file.name,
+      progress: 0,
+      speed: "0 KB/s",
+      done: false
+    };
+
+    stream.on('data', (chunk) => {
+        downloaded += chunk.length;
+
+        const percent = ((downloaded / file.size) * 100).toFixed(2);
+        const elapsed = (Date.now() - startTime) / 1000;
+        const speed = (downloaded / 1024 / 1024 / elapsed).toFixed(2) + " MB/s";
+
+        downloadStatus.progress = Number(percent);
+        downloadStatus.speed = speed;
+    });
+
+    stream.pipe(writeStream);
+
+    writeStream.on('finish', () => {
+        downloadStatus.status = "finished";
+        downloadStatus.progress = 100;
+        downloadStatus.done = true;
+
+        console.log("✅ Download complete");
+
+        res.send({
+           message: "Downloaded",
+           file:  `/download/${file.name}`
+        });
     });
 
   } catch (err) {
