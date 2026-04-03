@@ -14,6 +14,14 @@ app = Client("uploader_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOK
 
 processed = set()
 
+import json
+
+STATUS_FILE = "upload-status.json"
+
+def update_status(data):
+    with open(STATUS_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+
 def get_duration(file_path):
     try:
         output = subprocess.check_output([
@@ -29,6 +37,69 @@ def get_duration(file_path):
         return 0
 
 async def upload(file_path):
+    name = os.path.basename(file_path)
+
+    try:
+        update_status({
+            "status": "uploading",
+            "file": name,
+            "progress": 0,
+            "done": False
+        })
+
+        print(f"📤 Uploading: {name}")
+
+        async def progress(current, total):
+            percent = int(current * 100 / total)
+
+            update_status({
+                "status": "uploading",
+                "file": name,
+                "progress": percent,
+                "done": False
+            })
+
+        if name.lower().endswith((".mp4", ".mkv", ".avi", ".mov", ".webm")):
+            duration = get_duration(file_path)
+
+            await app.send_video(
+                CHAT_ID,
+                video=file_path,
+                caption=name,
+                duration=duration,
+                supports_streaming=True,
+                progress=progress
+            )
+        else:
+            await app.send_document(
+                CHAT_ID,
+                document=file_path,
+                caption=name,
+                progress=progress
+            )
+
+        update_status({
+            "status": "finished",
+            "file": name,
+            "progress": 100,
+            "done": True
+        })
+
+        print(f"✅ Uploaded: {name}")
+
+        os.remove(file_path)
+
+    except Exception as e:
+        update_status({
+            "status": "error",
+            "file": name,
+            "progress": 0,
+            "done": False
+        })
+
+        print("❌ Upload error:", e)
+
+async def upload_(file_path):
     name = os.path.basename(file_path)
 
     try:
