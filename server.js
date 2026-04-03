@@ -116,7 +116,7 @@ app.get('/upload-status', (req, res) => {
   if (!fs.existsSync(filePath)) {
     return res.json({ status: "no data" });
   }
-
+  
   res.sendFile(filePath);
 });
 /* ---------------------------
