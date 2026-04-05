@@ -17,9 +17,9 @@ File.defaultHandleRetries = (tries, error, cb) => {
 const app = express();
 const PORT = 8000;
 
-const this_server="";
-const bot_server = "";
-upload_chat="";
+const this_server = "https://unfair-carolin-dhyi-2885f9fd.koyeb.app";
+const bot_server = "https://joyous-locust-gimhan-3992e08d.koyeb.app";
+upload_chat = "-1003875761551";
 
 let queue = [];
 let isProcessing = false;
