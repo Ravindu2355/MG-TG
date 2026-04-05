@@ -40,7 +40,7 @@ let downloadStatus = {
 };
 
 function cleanNode(node) {
-  console.log(node);
+  //console.log(node);
   return {
     name: node.name,
     size: node.size,
@@ -298,6 +298,7 @@ app.get('/download', async (req, res) => {
     const megaFile = await megaFol.loadAttributes();
     //const megaFile = file.node;
     const savePath = path.join(DOWNLOAD_DIR, file.name);
+    const fileUrl = `${this_server}/download/${encodeURIComponent(file.name)}`;
     
     /* Crashed 👇 for bigger files */
     /*const data = await megaFile.downloadBuffer();
@@ -360,7 +361,8 @@ app.get('/download', async (req, res) => {
 
         res.send({
            message: "Downloaded",
-           file:  `/download/${file.name}`
+           file:  `/download/${file.name}`,
+           url: fileUrl
         });
     });
 
