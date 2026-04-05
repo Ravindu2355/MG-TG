@@ -97,16 +97,15 @@ function walk(node, results, pathStr = '') {
 async function processQueue() {
   if (isProcessing || queue.length === 0) return;
   
-  if (isPaused) {
-      console.log("⏸️ Waiting for bandwidth reset...");
-      await sleep(5000);
-      continue;
-  }
-  
   isProcessing = true;
 
   while (queue.length > 0) {
     const file = queue[0]; // 👈 DON'T shift yet
+    if (isPaused) {
+      console.log("⏸️ Waiting for bandwidth reset...");
+      await sleep(5000);
+      continue;
+    }
     const savePath = path.join(DOWNLOAD_DIR, file.name);
     const fileUrl = `${this_server}/download/${encodeURIComponent(file.name)}`;
     if (file.size > maxSize) {
