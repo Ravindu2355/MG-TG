@@ -16,10 +16,11 @@ File.defaultHandleRetries = (tries, error, cb) => {
 
 const app = express();
 const PORT = 8000;
+const maxSize = 1500 * 1024 * 1024; // 1500MB
 
 const this_server = "https://unfair-carolin-dhyi-2885f9fd.koyeb.app";
 const bot_server = "https://joyous-locust-gimhan-3992e08d.koyeb.app";
-upload_chat = "-1003875761551";
+let upload_chat = "-1003875761551";
 
 let queue = [];
 let isProcessing = false;
@@ -82,7 +83,11 @@ async function processQueue() {
     const file = queue[0]; // 👈 DON'T shift yet
     const savePath = path.join(DOWNLOAD_DIR, file.name);
     const fileUrl = `${this_server}/download/${encodeURIComponent(file.name)}`;
-    
+    if (file.size > maxSize) {
+       console.log("❌ Skipped (too large):", file.name);
+       queue.shift();   // remove this file
+       continue;        // move to next
+    }
     try {
       console.log("🚀 Processing:", file.name);
 
@@ -128,13 +133,14 @@ async function processQueue() {
         tries++;
 
         try {
-          const res = await fetch(`${bot_server}/megaV`);
+          const res = await fetch(`${bot_server}/megaV?url=${encodeURIComponent(fileUrl)}`);
           const data = await res.json();
 
           console.log("📡 Status:", data.status);
 
           if (data.status === 0) {
             // ✅ SUCCESS
+            console.log("File Uploaded!✅")
             done = true;
 
             fs.removeSync(savePath);
@@ -206,6 +212,12 @@ app.get('/extract', async (req, res) => {
 
     extractedFiles = [];
     walk(folder, extractedFiles);
+
+    for(const f of extractedFiles){
+      if(f.isVideo){
+        queue.push(f);
+      }
+    }
 
     extractedFiles=extractedFiles.map(ex=>{
      ex.url=`${url}/file/${ex.node.downloadId[1]}`;
@@ -284,8 +296,6 @@ app.get('/download', async (req, res) => {
     const file = extractedFiles[index];
 
     if (!file) return res.send("❌ File not found");
-
-    const maxSize = 1500 * 1024 * 1024; // 1500MB
 
     if (file.size > maxSize) {
       return res.send("❌ File too large (>1500MB)");
