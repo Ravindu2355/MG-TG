@@ -114,6 +114,11 @@ async function processQueue() {
        queue.shift();   // remove this file
        continue;        // move to next
     }
+    if (file.size == 0) {
+       console.log("❌ Skipped (0 bytes):", file.name);
+       queue.shift();   // remove this file
+       continue;        // move to next
+    }
     try {
       console.log("🚀 Processing:", file.name, formatBytes(file.size));
 
@@ -228,7 +233,9 @@ async function processQueue() {
 
       if (!done) {
         console.log("❌ Max retries reached, skipping...");
-        fs.removeSync(savePath);
+        if (fs.existsSync(savePath)) {
+           fs.removeSync(savePath);
+        }
         queue.shift();
       }
 
@@ -258,7 +265,9 @@ async function processQueue() {
 
       } else {
         // ❗ Other errors → skip file
-        fs.removeSync(item.path);
+        if (fs.existsSync(savePath)) {
+           fs.removeSync(savePath);
+        }
         queue.shift();
       }
       //-------
