@@ -25,6 +25,14 @@ let upload_chat = "-1003875761551";
 let queue = [];
 let isProcessing = false;
 
+//for band width errors
+let isPaused = false;
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+//---------------------
+
 const DOWNLOAD_DIR = path.join(__dirname, 'downloads');
 const JSON_FILE = path.join(__dirname, 'files.json');
 
@@ -88,7 +96,13 @@ function walk(node, results, pathStr = '') {
 
 async function processQueue() {
   if (isProcessing || queue.length === 0) return;
-
+  
+  if (isPaused) {
+      console.log("⏸️ Waiting for bandwidth reset...");
+      await sleep(5000);
+      continue;
+  }
+  
   isProcessing = true;
 
   while (queue.length > 0) {
@@ -221,9 +235,37 @@ async function processQueue() {
     } catch (err) {
       console.error("❌ Error:", err.message);
 
+      //Band wdth err
+      const msg = err.message || "";
+
+      // 🔍 Detect bandwidth limit
+      const match = msg.match(/(\d+)\s*seconds/);
+
+      if (msg.includes("Bandwidth limit") && match) {
+        const seconds = parseInt(match[1], 10);
+
+        const waitTime = (seconds + 2) * 1000; // +2 sec buffer
+
+        console.log(`⛔ Bandwidth hit. Sleeping for ${seconds + 2} seconds`);
+
+        isPaused = true;
+
+        setTimeout(() => {
+          isPaused = false;
+          console.log("▶️ Resuming queue...");
+        }, waitTime);
+
+      } else {
+        // ❗ Other errors → skip file
+        fs.removeSync(item.path);
+        queue.shift();
+      }
+      //-------
+      
       // ❗ Optional: retry or skip
-      fs.removeSync(savePath);
-      queue.shift();
+      
+      //fs.removeSync(savePath);
+      //queue.shift();
     }
   }
 
