@@ -292,6 +292,26 @@ async function startQueueWorker() {
 app.get('/', (req, res) => {
   res.send("Hello World");
 });
+
+app.get("/skip", (req, res) => {
+  let count = parseInt(req.query.count, 10) || 1;
+
+  if (count < 1) count = 1;
+
+  if (count > queue.length) {
+    count = queue.length;
+  }
+
+  const skipped = queue.splice(0, count);
+
+  console.log(`⏭️ Skipped ${count} items`);
+
+  res.json({
+    success: true,
+    skipped: skipped.length,
+    remaining: queue.length
+  });
+});
 /* ---------------------------
    EXTRACT
 --------------------------- */
