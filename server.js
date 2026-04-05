@@ -101,7 +101,7 @@ async function processQueue() {
        continue;        // move to next
     }
     try {
-      console.log("🚀 Processing:", file.name, fromatBytes(file.size));
+      console.log("🚀 Processing:", file.name, formatBytes(file.size));
 
       /* -------- DOWNLOAD (only if not exists) -------- */
       if (!fs.existsSync(savePath)) {
