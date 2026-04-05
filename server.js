@@ -27,6 +27,7 @@ let isProcessing = false;
 
 //for band width errors
 let isPaused = false;
+let bandwidthSleep = 0;
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -248,7 +249,8 @@ async function processQueue() {
         console.log(`⛔ Bandwidth hit. Sleeping for ${seconds + 2} seconds`);
 
         isPaused = true;
-
+        bandwidthSleep = waitTime;
+        
         setTimeout(() => {
           isPaused = false;
           console.log("▶️ Resuming queue...");
@@ -261,10 +263,6 @@ async function processQueue() {
       }
       //-------
       
-      // ❗ Optional: retry or skip
-      
-      //fs.removeSync(savePath);
-      //queue.shift();
     }
   }
 
@@ -289,7 +287,7 @@ async function startQueueWorker() {
 }
 
 app.get('/', (req, res) => {
-  res.send("Hello World");
+  res.send(`Hello World paused:${isPaused} for time:${bandwidthSleep}s`);
 });
 
 app.get("/skip", (req, res) => {
