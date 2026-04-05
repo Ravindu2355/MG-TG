@@ -188,6 +188,9 @@ async function startQueueWorker() {
   }
 }
 
+app.get('/', (req, res) => {
+  res.send("Hello World");
+});
 /* ---------------------------
    EXTRACT
 --------------------------- */
