@@ -17,6 +17,13 @@ File.defaultHandleRetries = (tries, error, cb) => {
 const app = express();
 const PORT = 8000;
 
+const this_server="";
+const bot_server = "";
+upload_chat="";
+
+let queue = [];
+let isProcessing = false;
+
 const DOWNLOAD_DIR = path.join(__dirname, 'downloads');
 const JSON_FILE = path.join(__dirname, 'files.json');
 
@@ -63,6 +70,120 @@ function walk(node, results, pathStr = '') {
       isVideo: /\.(mp4|mkv|avi|mov|webm)$/i.test(node.name),
       node:cleanNode(node)
     });
+  }
+}
+
+async function processQueue() {
+  if (isProcessing || queue.length === 0) return;
+
+  isProcessing = true;
+
+  while (queue.length > 0) {
+    const file = queue[0]; // 👈 DON'T shift yet
+    const savePath = path.join(DOWNLOAD_DIR, file.name);
+
+    try {
+      console.log("🚀 Processing:", file.name);
+
+      /* -------- DOWNLOAD (only if not exists) -------- */
+      if (!fs.existsSync(savePath)) {
+        const megaFol = File.fromURL(file.url);
+        const megaFile = await megaFol.loadAttributes();
+
+        const stream = await megaFile.download();
+        const writeStream = fs.createWriteStream(savePath);
+
+        await new Promise((resolve, reject) => {
+          stream.pipe(writeStream);
+          stream.on('error', reject);
+          writeStream.on('finish', resolve);
+          writeStream.on('error', reject);
+        });
+
+        console.log("✅ Downloaded");
+      } else {
+        console.log("📁 File already exists, skipping download");
+      }
+
+      /* -------- SEND TO BOT -------- */
+      await fetch(`${bot_server}/add_task`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: this_server+"/"+savePath,
+          chat_id: upload_chat,
+          type: "direct"
+        })
+      });
+
+      console.log("📤 Sent to bot");
+
+      /* -------- CHECK STATUS LOOP -------- */
+      let done = false;
+      let tries = 0;
+
+      while (!done && tries < 50) { // 👈 LIMIT (important)
+        await new Promise(r => setTimeout(r, 3000));
+        tries++;
+
+        try {
+          const res = await fetch(`${bot_server}/megaV`);
+          const data = await res.json();
+
+          console.log("📡 Status:", data.status);
+
+          if (data.status === 0) {
+            // ✅ SUCCESS
+            done = true;
+
+            fs.removeSync(savePath);
+            console.log("🧹 Deleted file");
+
+            queue.shift(); // 👈 NOW remove from queue
+          }
+
+          if (data.status === 1) {
+            console.log("🔁 Retry needed...");
+            // ❗ DO NOTHING → loop again
+          }
+
+        } catch (e) {
+          console.log("⚠️ Status check failed");
+        }
+      }
+
+      if (!done) {
+        console.log("❌ Max retries reached, skipping...");
+        fs.removeSync(savePath);
+        queue.shift();
+      }
+
+    } catch (err) {
+      console.error("❌ Error:", err.message);
+
+      // ❗ Optional: retry or skip
+      fs.removeSync(savePath);
+      queue.shift();
+    }
+  }
+
+  isProcessing = false;
+}
+
+async function startQueueWorker() {
+  console.log("👷 Queue worker started");
+
+  while (true) {
+    try {
+      if (!isProcessing && queue.length > 0) {
+        await processQueue();
+      }
+    } catch (err) {
+      console.error("❌ Worker error:", err.message);
+    }
+
+    // small delay to prevent CPU overuse
+    await new Promise(r => setTimeout(r, 2000));
   }
 }
 
@@ -269,6 +390,7 @@ app.get('/clean', (req, res) => {
 /* ---------------------------
    START SERVER
 --------------------------- */
-app.listen(PORT, () => {
+app.listen(PORT,async () => {
   console.log(`🚀 Server running: http://localhost:${PORT}`);
+  startQueueWorker();
 });
