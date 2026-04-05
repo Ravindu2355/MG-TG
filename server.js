@@ -53,6 +53,18 @@ function cleanNode(node) {
   };
 }
 
+function formatBytes(bytes, decimals = 2) {
+  if (bytes === 0) return "0 Bytes";
+
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
+}
+  
 /* ---------------------------
    Extract Mega Folder
 --------------------------- */
@@ -89,7 +101,7 @@ async function processQueue() {
        continue;        // move to next
     }
     try {
-      console.log("🚀 Processing:", file.name);
+      console.log("🚀 Processing:", file.name, fromatBytes(file.size));
 
       /* -------- DOWNLOAD (only if not exists) -------- */
       if (!fs.existsSync(savePath)) {
@@ -99,12 +111,53 @@ async function processQueue() {
         const stream = await megaFile.download();
         const writeStream = fs.createWriteStream(savePath);
 
-        await new Promise((resolve, reject) => {
+        /*await new Promise((resolve, reject) => {
           stream.pipe(writeStream);
           stream.on('error', reject);
           writeStream.on('finish', resolve);
           writeStream.on('error', reject);
+        });*/
+
+        /**/
+        let downloaded = 0;
+        let startTime = Date.now();
+
+        downloadStatus = {
+          status: "downloading",
+          file: file.name,
+          progress: 0,
+          speed: "0 MB/s",
+          done: false
+        };
+
+        await new Promise((resolve, reject) => {
+          stream.on('data', (chunk) => {
+            downloaded += chunk.length;
+
+            const percent = ((downloaded / file.size) * 100).toFixed(2);
+            const elapsed = (Date.now() - startTime) / 1000;
+
+            const speed = elapsed > 0 ? (downloaded / 1024 / 1024 / elapsed).toFixed(2) + " MB/s" : "0 MB/s";
+
+            downloadStatus.progress = Number(percent);
+            downloadStatus.speed = speed;
+          });
+
+          stream.on('error', reject);
+          writeStream.on('error', reject);
+
+          writeStream.on('finish', () => {
+            downloadStatus.status = "finished";
+            downloadStatus.progress = 100;
+            downloadStatus.done = true;
+
+            console.log("✅ Download complete");
+            resolve();
+          });
+
+          stream.pipe(writeStream);
         });
+        /**/
 
         console.log("✅ Downloaded");
       } else {
@@ -128,7 +181,7 @@ async function processQueue() {
       let done = false;
       let tries = 0;
 
-      while (!done && tries < 50) { // 👈 LIMIT (important)
+      while (!done && tries < 200) { // 👈 LIMIT (important)
         await new Promise(r => setTimeout(r, 3000));
         tries++;
 
@@ -354,7 +407,8 @@ app.get('/download', async (req, res) => {
 
         const percent = ((downloaded / file.size) * 100).toFixed(2);
         const elapsed = (Date.now() - startTime) / 1000;
-        const speed = (downloaded / 1024 / 1024 / elapsed).toFixed(2) + " MB/s";
+        //const speed = (downloaded / 1024 / 1024 / elapsed).toFixed(2) + " MB/s";
+        const speed = elapsed > 0 ? (downloaded / 1024 / 1024 / elapsed).toFixed(2) + " MB/s" : "0 MB/s";
 
         downloadStatus.progress = Number(percent);
         downloadStatus.speed = speed;
