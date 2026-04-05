@@ -81,7 +81,8 @@ async function processQueue() {
   while (queue.length > 0) {
     const file = queue[0]; // 👈 DON'T shift yet
     const savePath = path.join(DOWNLOAD_DIR, file.name);
-
+    const fileUrl = `${this_server}/download/${encodeURIComponent(file.name)}`;
+    
     try {
       console.log("🚀 Processing:", file.name);
 
@@ -110,7 +111,7 @@ async function processQueue() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          url: this_server+"/"+savePath,
+          url: fileUrl,
           chat_id: upload_chat,
           type: "direct"
         })
