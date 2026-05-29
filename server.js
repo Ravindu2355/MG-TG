@@ -85,7 +85,7 @@ function chunkArray(arr, size) {
 }
 
 //---TG--------------------
-async function uploadImageGroupToTelegram(files) {
+async function uploadImageGroupToTelegram_form_err(files) {
   const form = new FormData();
 
   const media = files.map((file, i) => {
@@ -119,7 +119,42 @@ async function uploadImageGroupToTelegram(files) {
   return await res.json();
 }
 
-async function uploadImageGroupToTelegram_Old(files) {
+async function uploadImageGroupToTelegram(files) {
+  const existingFiles = files.filter(file =>
+    fs.existsSync(path.join(__dirname, "download", file.name))
+  );
+
+  const media = existingFiles.map(file => ({
+    type: "photo",
+    media: `${this_server}/download/${encodeURIComponent(file.name)}`
+  }));
+
+  if (!media.length) {
+    return {
+      ok: false,
+      error_code: 400,
+      description: "No files found in download directory"
+    };
+  }
+
+  const res = await fetch(
+    `https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        chat_id: IMAGE_CHAT_ID,
+        media
+      })
+    }
+  );
+
+  return await res.json();
+}
+
+async function uploadImageGroupToTelegram_old(files) {
   const media = files.map((file, i) => ({
     type: "photo",
     media: `${this_server}/download/${encodeURIComponent(file.name)}`
