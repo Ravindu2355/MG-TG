@@ -121,7 +121,7 @@ async function uploadImageGroupToTelegram_form_err(files) {
 
 async function uploadImageGroupToTelegram(files) {
   const existingFiles = files.filter(file =>
-    fs.existsSync(path.join(__dirname, "download", file.name))
+    fs.existsSync(path.join(DOWNLOAD_DIR, file.name))
   );
 
   const media = existingFiles.map(file => ({
