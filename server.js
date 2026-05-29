@@ -21,8 +21,8 @@ const maxSize = 1500 * 1024 * 1024; // 1500MB
 const this_server = "https://unfair-carolin-dhyi-2885f9fd.koyeb.app";
 const bot_server = "https://joyous-locust-gimhan-3992e08d.koyeb.app";
 let upload_chat = "-1003875761551";
-const BOT_TOKEN = "YOUR_BOT_TOKEN";
-const IMAGE_CHAT_ID = "-100xxxxxxxxxx"; // channel/chat id
+const BOT_TOKEN = "8743284116:AAEhAU5olho0unQBOF7j8jlohpyMgus_Rz8";
+const IMAGE_CHAT_ID = "-1003704662018"; // channel/chat id
 
 let queue = [];
 let isProcessing = false;
