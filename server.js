@@ -441,10 +441,12 @@ async function processImageQueue() {
       try {
         console.log(`📤 Uploading ${downloadedFiles.length} files`);
 
-        await uploadImageGroupToTelegram(downloadedFiles);
-
+        const ur = await uploadImageGroupToTelegram(downloadedFiles);
+        if(!ur.ok) console.log("TG SAYS:",ur.description);
+        
       } catch (err) {
         console.error("❌ Upload failed:", err.message);
+        if(ur) console.log("TG SAYS:",ur.description);
       }
     } else {
       console.log("⚠️ No files downloaded successfully");
