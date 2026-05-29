@@ -373,6 +373,97 @@ app.get("/extract-images", async (req, res) => {
     const url = req.query.url;
 
     if (!url) {
+      return res.status(400).send("Missing url");
+    }
+
+    console.log("🖼 Extracting:", url);
+
+    const folder = await File.fromURL(url).loadAttributes();
+
+    const allFiles = [];
+    walk(folder, allFiles);
+
+    const imageFiles = allFiles.filter(f => isImage(f.name));
+
+    if (!imageFiles.length) {
+      return res.send("No images found");
+    }
+
+    // quick response to user immediately
+    res.json({
+      success: true,
+      total: imageFiles.length,
+      message: `${imageFiles.length} images found. Upload started.`
+    });
+
+    console.log(`✅ Found ${imageFiles.length} images`);
+
+    // process 10 by 10
+    for (let i = 0; i < imageFiles.length; i += 10) {
+      const group = imageFiles.slice(i, i + 10);
+
+      console.log(
+        `⬇️ Downloading batch ${Math.floor(i / 10) + 1} (${group.length} files)`
+      );
+
+      // download only this batch
+      for (const file of group) {
+        try {
+          const savePath = path.join(DOWNLOAD_DIR, file.name);
+
+          file.url = `${url}/file/${file.node.downloadId[1]}`;
+
+          console.log("⬇️ Downloading:", file.name);
+          
+          const megaFile = await File.fromURL(file.url).loadAttributes();
+          const stream = await megaFile.download();
+
+          await new Promise((resolve, reject) => {
+            const writeStream = fs.createWriteStream(savePath);
+
+            stream.pipe(writeStream);
+            stream.on("error", reject);
+            writeStream.on("finish", resolve);
+            writeStream.on("error", reject);
+          });
+
+        } catch (err) {
+          console.error(`❌ Failed download: ${file.name}`, err);
+        }
+      }
+
+      console.log(`📤 Uploading batch ${Math.floor(i / 10) + 1}`);
+
+      await uploadImageGroupToTelegram(group);
+
+      console.log(`🗑 Cleaning batch ${Math.floor(i / 10) + 1}`);
+
+      // delete only this batch
+      for (const file of group) {
+        const p = path.join(DOWNLOAD_DIR, file.name);
+
+        if (fs.existsSync(p)) {
+          fs.removeSync(p);
+        }
+      }
+    }
+
+    console.log("🎉 Done");
+
+  } catch (err) {
+    console.error(err);
+
+    if (!res.headersSent) {
+      res.status(500).send("Image upload failed");
+    }
+  }
+});
+
+app.get("/extract-images-old", async (req, res) => {
+  try {
+    const url = req.query.url;
+
+    if (!url) {
       return res.send("Missing url");
     }
 
