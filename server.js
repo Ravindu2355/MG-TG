@@ -378,6 +378,8 @@ async function processImageQueue() {
 
       for (const file of batch) {
         const savePath = path.join(DOWNLOAD_DIR, file.name);
+        
+        console.log("⬇️ Downloading:", file.name);
 
         const megaFile = await File.fromURL(file.url).loadAttributes();
         const stream = await megaFile.download();
