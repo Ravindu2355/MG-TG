@@ -397,6 +397,7 @@ async function processImageQueue() {
         });
 
         downloadedFiles.push(file);
+        await sleep(1000);
 
       } catch (err) {
         console.error(`❌ Failed: ${file.name}`, err.message);
