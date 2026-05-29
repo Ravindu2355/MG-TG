@@ -382,9 +382,7 @@ async function processImageQueue() {
 
         console.log("⬇️ Downloading:", file.name);
 
-        const megaFile = await File.fromURL(file.url);
-        await megaFile.loadAttributes();
-
+        const megaFile = await File.fromURL(file.url).loadAttributes();
         const stream = await megaFile.download();
 
         await new Promise((resolve, reject) => {
