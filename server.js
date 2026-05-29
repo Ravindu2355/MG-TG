@@ -446,7 +446,7 @@ async function processImageQueue() {
         
       } catch (err) {
         console.error("❌ Upload failed:", err.message);
-        if(ur) console.log("TG SAYS:",ur.description);
+        console.log(err);
       }
     } else {
       console.log("⚠️ No files downloaded successfully");
