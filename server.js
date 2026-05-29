@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require("cors");
 const fs = require('fs-extra');
+const FormData = require("form-data");
 const path = require('path');
 const { File } = require('megajs');
 
@@ -85,6 +86,40 @@ function chunkArray(arr, size) {
 
 //---TG--------------------
 async function uploadImageGroupToTelegram(files) {
+  const form = new FormData();
+
+  const media = files.map((file, i) => {
+    const attachName = `photo${i}`;
+
+    form.append(
+      attachName,
+      fs.createReadStream(
+        path.join(DOWNLOAD_DIR, file.name)
+      )
+    );
+
+    return {
+      type: "photo",
+      media: `attach://${attachName}`
+    };
+  });
+
+  form.append("chat_id", IMAGE_CHAT_ID);
+  form.append("media", JSON.stringify(media));
+
+  const res = await fetch(
+    `https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup`,
+    {
+      method: "POST",
+      body: form,
+      headers: form.getHeaders()
+    }
+  );
+
+  return await res.json();
+}
+
+async function uploadImageGroupToTelegram_Old(files) {
   const media = files.map((file, i) => ({
     type: "photo",
     media: `${this_server}/download/${encodeURIComponent(file.name)}`
