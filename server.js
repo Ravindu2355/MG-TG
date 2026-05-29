@@ -90,7 +90,7 @@ async function uploadImageGroupToTelegram(files) {
   }));
 
   form.append("chat_id", IMAGE_CHAT_ID);
-  form.append("media", JSON.stringify(media));
+  form.append("media", media);
 
   files.forEach((file, i) => {
     form.append(
