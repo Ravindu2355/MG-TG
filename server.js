@@ -82,28 +82,22 @@ function chunkArray(arr, size) {
 
 //---TG--------------------
 async function uploadImageGroupToTelegram(files) {
-  const form = new FormData();
-
   const media = files.map((file, i) => ({
     type: "photo",
-    media: `attach://photo${i}`
+    media: `${this_server}/download/${encodeURIComponent(file.name)}`
   }));
-
-  form.append("chat_id", IMAGE_CHAT_ID);
-  form.append("media", media);
-
-  files.forEach((file, i) => {
-    form.append(
-      `photo${i}`,
-      fs.createReadStream(path.join(DOWNLOAD_DIR, file.name))
-    );
-  });
 
   const res = await fetch(
     `https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup`,
     {
       method: "POST",
-      body: form
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        chat_id: IMAGE_CHAT_ID,
+        media
+      })
     }
   );
 
