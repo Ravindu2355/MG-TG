@@ -372,6 +372,71 @@ async function processImageQueue() {
 
   while (imageUploadQueue.length) {
     const batch = imageUploadQueue.shift();
+    const downloadedFiles = [];
+
+    console.log(`⬇️ Downloading batch (${batch.length})`);
+
+    for (const file of batch) {
+      try {
+        const savePath = path.join(DOWNLOAD_DIR, file.name);
+
+        console.log("⬇️ Downloading:", file.name);
+
+        const megaFile = await File.fromURL(file.url);
+        await megaFile.loadAttributes();
+
+        const stream = await megaFile.download();
+
+        await new Promise((resolve, reject) => {
+          const ws = fs.createWriteStream(savePath);
+
+          stream.pipe(ws);
+          stream.on("error", reject);
+          ws.on("finish", resolve);
+          ws.on("error", reject);
+        });
+
+        downloadedFiles.push(file);
+
+      } catch (err) {
+        console.error(`❌ Failed: ${file.name}`, err.message);
+      }
+    }
+
+    if (downloadedFiles.length > 0) {
+      try {
+        console.log(`📤 Uploading ${downloadedFiles.length} files`);
+
+        await uploadImageGroupToTelegram(downloadedFiles);
+
+      } catch (err) {
+        console.error("❌ Upload failed:", err.message);
+      }
+    } else {
+      console.log("⚠️ No files downloaded successfully");
+    }
+
+    console.log("🧹 Cleaning batch");
+
+    for (const file of downloadedFiles) {
+      const p = path.join(DOWNLOAD_DIR, file.name);
+
+      if (fs.existsSync(p)) {
+        fs.removeSync(p);
+      }
+    }
+  }
+
+  isImageUploading = false;
+}
+
+async function processImageQueue_Old() {
+  if (isImageUploading || imageUploadQueue.length === 0) return;
+
+  isImageUploading = true;
+
+  while (imageUploadQueue.length) {
+    const batch = imageUploadQueue.shift();
 
     try {
       console.log(`⬇️ Downloading batch (${batch.length})`);
