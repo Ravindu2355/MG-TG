@@ -21,6 +21,8 @@ const maxSize = 1500 * 1024 * 1024; // 1500MB
 const this_server = "https://unfair-carolin-dhyi-2885f9fd.koyeb.app";
 const bot_server = "https://joyous-locust-gimhan-3992e08d.koyeb.app";
 let upload_chat = "-1003875761551";
+const BOT_TOKEN = "YOUR_BOT_TOKEN";
+const IMAGE_CHAT_ID = "-100xxxxxxxxxx"; // channel/chat id
 
 let queue = [];
 let isProcessing = false;
@@ -60,6 +62,49 @@ function cleanNode(node) {
       : undefined,
     downloadId:node.downloadId
   };
+}
+
+//---img check ------------
+function isImage(name) {
+  return /\.(jpg|jpeg|png|webp|gif)$/i.test(name);
+}
+
+function chunkArray(arr, size) {
+  const chunks = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
+}
+
+//---TG--------------------
+async function uploadImageGroupToTelegram(files) {
+  const form = new FormData();
+
+  const media = files.map((file, i) => ({
+    type: "photo",
+    media: `attach://photo${i}`
+  }));
+
+  form.append("chat_id", IMAGE_CHAT_ID);
+  form.append("media", JSON.stringify(media));
+
+  files.forEach((file, i) => {
+    form.append(
+      `photo${i}`,
+      fs.createReadStream(path.join(DOWNLOAD_DIR, file.name))
+    );
+  });
+
+  const res = await fetch(
+    `https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup`,
+    {
+      method: "POST",
+      body: form
+    }
+  );
+
+  return await res.json();
 }
 
 function formatBytes(bytes, decimals = 2) {
@@ -318,6 +363,78 @@ app.get("/skip", (req, res) => {
     remaining: queue.length
   });
 });
+
+/*------*IMG ONLY DL ----------*/
+app.get("/extract-images", async (req, res) => {
+  try {
+    const url = req.query.url;
+
+    if (!url) {
+      return res.send("Missing url");
+    }
+
+    console.log("🖼 Extracting images from:", url);
+
+    const folder = await File.fromURL(url).loadAttributes();
+
+    const allFiles = [];
+    walk(folder, allFiles);
+
+    const imageFiles = allFiles.filter(f => isImage(f.name));
+
+    if (imageFiles.length === 0) {
+      return res.send("No images found");
+    }
+
+    for (const file of imageFiles) {
+      const savePath = path.join(DOWNLOAD_DIR, file.name);
+
+      file.url = `${url}/file/${file.node.downloadId[1]}`;
+
+      console.log("⬇️ Downloading:", file.name);
+
+      const megaFile = await File.fromURL(file.url).loadAttributes();
+
+      const stream = await megaFile.download();
+      const writeStream = fs.createWriteStream(savePath);
+
+      await new Promise((resolve, reject) => {
+        stream.pipe(writeStream);
+        stream.on("error", reject);
+        writeStream.on("finish", resolve);
+        writeStream.on("error", reject);
+      });
+    }
+
+    console.log("✅ All images downloaded");
+
+    const groups = chunkArray(imageFiles, 10);
+
+    for (const group of groups) {
+      console.log(`📤 Uploading group (${group.length})`);
+
+      await uploadImageGroupToTelegram(group);
+
+      for (const file of group) {
+        const p = path.join(DOWNLOAD_DIR, file.name);
+        if (fs.existsSync(p)) {
+          fs.removeSync(p);
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      total: imageFiles.length,
+      groups: groups.length
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Image upload failed");
+  }
+});
+
 /* ---------------------------
    EXTRACT
 --------------------------- */
