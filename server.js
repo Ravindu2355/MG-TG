@@ -1,4 +1,5 @@
 const express = require('express');
+const cors = require("cors");
 const fs = require('fs-extra');
 const path = require('path');
 const { File } = require('megajs');
@@ -15,6 +16,8 @@ File.defaultHandleRetries = (tries, error, cb) => {
 };
 
 const app = express();
+app.use(cors());
+
 const PORT = 8000;
 const maxSize = 1500 * 1024 * 1024; // 1500MB
 
