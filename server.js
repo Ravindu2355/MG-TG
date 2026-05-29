@@ -30,6 +30,9 @@ const IMAGE_CHAT_ID = "-1003704662018"; // channel/chat id
 let queue = [];
 let isProcessing = false;
 
+let imageUploadQueue = [];
+let isImageUploading = false;
+
 //for band width errors
 let isPaused = false;
 let bandwidthSleep = 0;
@@ -361,8 +364,99 @@ app.get("/skip", (req, res) => {
   });
 });
 
+    /*----- Image Up Quque --------*/
+async function processImageQueue() {
+  if (isImageUploading || imageUploadQueue.length === 0) return;
+
+  isImageUploading = true;
+
+  while (imageUploadQueue.length) {
+    const batch = imageUploadQueue.shift();
+
+    try {
+      console.log(`⬇️ Downloading batch (${batch.length})`);
+
+      for (const file of batch) {
+        const savePath = path.join(DOWNLOAD_DIR, file.name);
+
+        const megaFile = await File.fromURL(file.url).loadAttributes();
+        const stream = await megaFile.download();
+
+        await new Promise((resolve, reject) => {
+          const ws = fs.createWriteStream(savePath);
+
+          stream.pipe(ws);
+          stream.on("error", reject);
+          ws.on("finish", resolve);
+          ws.on("error", reject);
+        });
+      }
+
+      console.log("📤 Uploading batch");
+
+      await uploadImageGroupToTelegram(batch);
+
+      console.log("🧹 Cleaning batch");
+
+      for (const file of batch) {
+        const p = path.join(DOWNLOAD_DIR, file.name);
+
+        if (fs.existsSync(p)) {
+          fs.removeSync(p);
+        }
+      }
+
+    } catch (err) {
+      console.error("❌ Batch failed:", err.message);
+    }
+  }
+
+  isImageUploading = false;
+}
+
 /*------*IMG ONLY DL ----------*/
 app.get("/extract-images", async (req, res) => {
+  try {
+    const url = req.query.url;
+
+    if (!url) {
+      return res.status(400).send("Missing url");
+    }
+
+    const folder = await File.fromURL(url).loadAttributes();
+
+    const allFiles = [];
+    walk(folder, allFiles);
+
+    const imageFiles = allFiles.filter(f => isImage(f.name));
+
+    if (!imageFiles.length) {
+      return res.send("No images found");
+    }
+
+    for (const file of imageFiles) {
+      file.url = `${url}/file/${file.node.downloadId[1]}`;
+    }
+
+    imageUploadQueue.push(...chunkArray(imageFiles, 10));
+
+    processImageQueue();
+
+    res.json({
+      success: true,
+      total: imageFiles.length,
+      queued_batches: Math.ceil(imageFiles.length / 10),
+      message: "Upload started in background"
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Image upload failed");
+  }
+});
+
+//OLD-------------------------
+app.get("/extract-images-old", async (req, res) => {
   try {
     const url = req.query.url;
 
@@ -450,76 +544,6 @@ app.get("/extract-images", async (req, res) => {
     if (!res.headersSent) {
       res.status(500).send("Image upload failed");
     }
-  }
-});
-
-app.get("/extract-images-old", async (req, res) => {
-  try {
-    const url = req.query.url;
-
-    if (!url) {
-      return res.send("Missing url");
-    }
-
-    console.log("🖼 Extracting images from:", url);
-
-    const folder = await File.fromURL(url).loadAttributes();
-
-    const allFiles = [];
-    walk(folder, allFiles);
-
-    const imageFiles = allFiles.filter(f => isImage(f.name));
-
-    if (imageFiles.length === 0) {
-      return res.send("No images found");
-    }
-
-    for (const file of imageFiles) {
-      const savePath = path.join(DOWNLOAD_DIR, file.name);
-
-      file.url = `${url}/file/${file.node.downloadId[1]}`;
-
-      console.log("⬇️ Downloading:", file.name);
-
-      const megaFile = await File.fromURL(file.url).loadAttributes();
-
-      const stream = await megaFile.download();
-      const writeStream = fs.createWriteStream(savePath);
-
-      await new Promise((resolve, reject) => {
-        stream.pipe(writeStream);
-        stream.on("error", reject);
-        writeStream.on("finish", resolve);
-        writeStream.on("error", reject);
-      });
-    }
-
-    console.log("✅ All images downloaded");
-
-    const groups = chunkArray(imageFiles, 10);
-
-    for (const group of groups) {
-      console.log(`📤 Uploading group (${group.length})`);
-
-      await uploadImageGroupToTelegram(group);
-
-      for (const file of group) {
-        const p = path.join(DOWNLOAD_DIR, file.name);
-        if (fs.existsSync(p)) {
-          fs.removeSync(p);
-        }
-      }
-    }
-
-    res.json({
-      success: true,
-      total: imageFiles.length,
-      groups: groups.length
-    });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Image upload failed");
   }
 });
 
