@@ -119,11 +119,49 @@ async function uploadImageGroupToTelegram_form_err(files) {
   return await res.json();
 }
 
-async function uploadImageGroupToTelegram(files) {
+async function uploadImageGroupToTelegram(files, retry = 3) {
+  try {
+    const existingFiles = files.filter(file =>
+    fs.existsSync(path.join(DOWNLOAD_DIR, file.name))
+    );
+    console.log("✅Existing:",existingFiles.length,"files");
+    const media = existingFiles.map(file => ({
+      type: "photo",
+      media: `${this_server}/download/${encodeURIComponent(file.name)}`
+    }));
+
+    const res = await fetch(
+      `https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          chat_id: IMAGE_CHAT_ID,
+          media
+        })
+      }
+    );
+
+    return await res.json();
+
+  } catch (err) {
+    if (retry > 0) {
+      console.log(`🔁 Retry upload (${retry})...`);
+      await new Promise(r => setTimeout(r, 3000));
+      return uploadImageGroupToTelegram(files, retry - 1);
+    }
+
+    throw err;
+  }
+}
+
+async function uploadImageGroupToTelegram_o2(files) {
   const existingFiles = files.filter(file =>
     fs.existsSync(path.join(DOWNLOAD_DIR, file.name))
   );
-
+  console.log("✅Existing:",existingFiles.length,"files");
   const media = existingFiles.map(file => ({
     type: "photo",
     media: `${this_server}/download/${encodeURIComponent(file.name)}`
